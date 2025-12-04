@@ -24,7 +24,7 @@
 }
 // Add this to your package.json
 {
-  "homepage": "https://github.com/seafrexwebapp",
+  "homepage": "https://github.com/seafrexindia-prog/seafrex.github.io/seafrex",
   "scripts": {
     // ... existing scripts
     "predeploy": "npm run build",
