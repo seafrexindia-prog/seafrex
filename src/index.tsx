@@ -1,7 +1,7 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import './index.tsx'; // Assuming you might have css file later, but standard Vite apps have this
+
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
