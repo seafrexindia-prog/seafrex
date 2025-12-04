@@ -1,6 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import App from '../App';
+import App from './App'; // This now correctly points to src/App.tsx
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
