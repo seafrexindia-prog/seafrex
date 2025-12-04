@@ -1,33 +1,39 @@
 {
   "name": "seafrex-portal",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview"
+  "homepage": "https://seafrex-prog.github.io/seafrex",
+  "description": "Secure logistics portal for Seafrex with AI-powered onboarding.",
+  "author": "seafrex-prog",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seafrex-prog/seafrex.git"
   },
+  "bugs": {
+    "url": "https://github.com/seafrex-prog/seafrex/issues"
+  },
+  "license": "MIT",
   "dependencies": {
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
     "@google/genai": "^1.30.0",
     "lucide-react": "^0.555.0",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "react-markdown": "^10.1.0"
   },
   "devDependencies": {
-    "@types/node": "^22.14.0",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "~5.8.2",
-    "vite": "^6.2.0"
-  }
-}
-// Add this to your package.json
-{
-  "homepage": ""homepage": "https://seafrex.github.io/seafrexwebapp"
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "gh-pages": "^6.1.1",
+    "tailwindcss": "^3.4.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.1.4"
+  },
   "scripts": {
-    // ... existing scripts
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
     "predeploy": "npm run build",
-    "deploy": "gh-pages -d build"
+    "deploy": "gh-pages -d dist"
   }
 }
