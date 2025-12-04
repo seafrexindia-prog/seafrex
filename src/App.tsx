@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect } from 'react';
 import { AuthState, UserProfile } from './types';
-import { authService } from './services/authService';
-import { LoginForm } from './components/LoginForm';
-import { SignupForm } from './components/SignupForm';
-import { Dashboard } from './components/Dashboard';
-import { AdminPanel } from './components/AdminPanel';
-import { SubscriptionPage } from './components/SubscriptionPage';
+import { authService } from '../services/authService';
+import { LoginForm } from '../components/LoginForm';
+import { SignupForm } from '../components/SignupForm';
+import { Dashboard } from '../components/Dashboard';
+import { AdminPanel } from '../components/AdminPanel';
+import { SubscriptionPage } from '../components/SubscriptionPage';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AuthState>('LOGIN_EMAIL');
