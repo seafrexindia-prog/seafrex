@@ -25,6 +25,11 @@ export const SignupForm: React.FC<SignupFormProps> = ({ initialEmail, onSignupSu
     address: '',
     photoBase64: null,
     logoBase64: null,
+    // Placeholders - these will be overwritten by authService.registerUser
+    plan: 'FREE',
+    subscriptionStatus: 'ACTIVE',
+    registrationDate: new Date().toISOString(),
+    expiryDate: new Date().toISOString(),
   });
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {

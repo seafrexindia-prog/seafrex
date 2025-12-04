@@ -10,9 +10,10 @@ interface InternalPartyListProps {
   onEdit: (party: InternalParty) => void;
   onCreateNew: () => void;
   currentUser?: UserProfile;
+  onViewProfile?: (profile: Partial<UserProfile>) => void;
 }
 
-export const InternalPartyList: React.FC<InternalPartyListProps> = ({ onBack, onEdit, onCreateNew, currentUser }) => {
+export const InternalPartyList: React.FC<InternalPartyListProps> = ({ onBack, onEdit, onCreateNew, currentUser, onViewProfile }) => {
   const [parties, setParties] = useState<InternalParty[]>([]);
   const [displayedParties, setDisplayedParties] = useState<InternalParty[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -70,6 +71,20 @@ export const InternalPartyList: React.FC<InternalPartyListProps> = ({ onBack, on
       partyService.deleteParty(id);
       setParties(prev => prev.filter(p => p.id !== id));
       setDisplayedParties(prev => prev.filter(p => p.id !== id));
+    }
+  };
+
+  const handleProfileClick = (party: InternalParty) => {
+    if (onViewProfile) {
+        onViewProfile({
+            fullName: party.contactPerson,
+            companyName: party.companyName,
+            designation: party.designation,
+            email: party.email,
+            mobile: party.mobile,
+            address: `${party.address}, ${party.city}`,
+            role: 'Internal Party' as any
+        });
     }
   };
 
@@ -158,13 +173,13 @@ export const InternalPartyList: React.FC<InternalPartyListProps> = ({ onBack, on
                  {displayedParties.length > 0 ? (
                      displayedParties.map(party => (
                          <tr key={party.id} className="hover:bg-white/5 transition-colors group">
-                            <td className="px-6 py-4">
+                            <td className="px-6 py-4 cursor-pointer" onClick={() => handleProfileClick(party)}>
                                <div className="flex items-center space-x-3">
                                   <div className="w-9 h-9 rounded-full bg-ocean-800 flex items-center justify-center shrink-0 text-sm font-bold text-white border border-white/10">
                                       {party.contactPerson.charAt(0)}
                                   </div>
                                   <div className="flex flex-col">
-                                    <span className="font-medium text-white">{party.contactPerson}</span>
+                                    <span className="font-medium text-white hover:text-cyan-400 transition-colors underline decoration-dotted decoration-ocean-600 underline-offset-4">{party.contactPerson}</span>
                                     {party.designation && (
                                       <span className="text-[11px] text-ocean-400 flex items-center mt-0.5">
                                         <Briefcase className="w-3 h-3 mr-1 opacity-70" />
@@ -172,7 +187,7 @@ export const InternalPartyList: React.FC<InternalPartyListProps> = ({ onBack, on
                                       </span>
                                     )}
                                   </div>
-                               </div>
+                                </div>
                             </td>
                             <td className="px-6 py-4">
                                <span className="text-ocean-100 font-medium">{party.companyName}</span>

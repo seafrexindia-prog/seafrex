@@ -5,6 +5,8 @@ export enum UserRole {
   FORWARDER_AGENT = 'Forwarder / Agent'
 }
 
+export type SubscriptionPlan = 'FREE' | 'OFFICE' | 'CORPORATE';
+
 export interface UserProfile {
   email: string;
   mobile: string;
@@ -15,10 +17,16 @@ export interface UserProfile {
   address: string;
   photoBase64: string | null;
   logoBase64: string | null;
-  onboardingAnalysis?: string; // AI generated text
-  isMainUser?: boolean; // True if this is the account owner
-  branchId?: string; // ID of the branch this user belongs to
-  status?: 'ACTIVE' | 'SUSPENDED'; // Account status
+  onboardingAnalysis?: string;
+  isMainUser?: boolean;
+  branchId?: string;
+  status?: 'ACTIVE' | 'SUSPENDED';
+  
+  // Subscription Fields
+  plan: SubscriptionPlan;
+  subscriptionStatus: 'ACTIVE' | 'EXPIRED';
+  registrationDate: string;
+  expiryDate: string;
 }
 
 export interface Branch {
@@ -28,11 +36,11 @@ export interface Branch {
   city: string;
   status: 'ACTIVE' | 'SUSPENDED';
   isMainBranch: boolean;
-  createdBy?: string; // User email who created this record
+  createdBy?: string;
 }
 
 export interface SubUser {
-  id: string; // usually email
+  id: string;
   fullName: string;
   email: string;
   mobile: string;
@@ -41,8 +49,24 @@ export interface SubUser {
   branchId: string;
   status: 'ACTIVE' | 'SUSPENDED';
   photoBase64?: string | null;
-  createdBy?: string; // User email who created this record
+  createdBy?: string;
 }
+
+export interface ShippingLine {
+  id: string;
+  lineName: string;
+  unitName: string;
+  country: string;
+  status: 'ACTIVE' | 'SUSPENDED';
+  createdBy?: string;
+}
+
+// --- ADMIN MASTERS ---
+
+export interface PortMaster { id: string; name: string; shortName: string; fullName: string; country: string; }
+export interface LoadTypeMaster { id: string; loadType: string; detail: string; }
+export interface CurrencyMaster { id: string; currency: string; country: string; }
+export interface MatrixMaster { id: string; name: string; }
 
 export interface InternalParty {
   id: string;
@@ -53,7 +77,7 @@ export interface InternalParty {
   mobile: string;
   address: string;
   city: string;
-  createdBy?: string; // User email who created this record
+  createdBy?: string;
 }
 
 export interface NetworkParty {
@@ -65,7 +89,7 @@ export interface NetworkParty {
   email: string;
   city: string;
   photoUrl: string | null;
-  createdBy?: string; // User email who created this record
+  createdBy?: string;
 }
 
 export interface TicketHistory {
@@ -76,22 +100,21 @@ export interface TicketHistory {
 
 export interface EcrmTicket {
   id: string;
-  ticketNumber: string; // Auto-generated ID (e.g. TKT-1001)
+  ticketNumber: string;
   type: 'SENT' | 'RECEIVED';
-  partyType: 'NETWORK' | 'INTERNAL';
+  partyType: 'NETWORK' | 'INTERNAL' | 'ADMIN';
   partyName: string;
   subject: string;
   message: string;
   status: 'PENDING' | 'REPLIED' | 'RESOLVED';
   date: string;
   history: TicketHistory[];
-  createdBy?: string; // User email who created this record
+  createdBy?: string;
+  targetAdmin?: boolean;
 }
 
-// --- CHARGES MASTER TYPES ---
-
-export type ChargeMatrix = 'Per Container' | 'Per Tone' | 'Per KG' | 'Per BOX';
-export type Currency = 'INR' | 'USD';
+export type ChargeMatrix = string;
+export type Currency = string;
 
 export interface ChargeItem {
   id: string;
@@ -106,42 +129,38 @@ export interface ChargeHead {
   headName: string;
   items: ChargeItem[];
   status: 'ACTIVE' | 'SUSPENDED';
-  createdBy?: string; // User email who created this record
+  createdBy?: string;
 }
-
-// --- INQUIRY TYPES ---
 
 export type InquiryType = 'GENERAL' | 'SPECIFIC';
 export type InquiryGroup = 'GLOBAL' | 'NETWORK' | 'NETWORK_PARTY' | 'INTERNAL_PARTY';
-export type LoadType = '20 Feet Box' | '40 Feet Box' | '40 Feet HC' | 'LCL' | 'Bulk' | '20 ft OC' | '20 ft Tanker' | 'Bulk Vessel';
-export type InquiryMatrix = 'Container' | 'Box' | 'Tone' | 'Kgs';
+export type LoadType = string;
+export type InquiryMatrix = string;
 
 export interface Inquiry {
   id: string;
   inquiryNumber: string;
   inquiryType: InquiryType;
   inquiryGroup: InquiryGroup;
-  targetPartyId?: string; // ID of Network or Internal Party
-  targetPartyName?: string; // Snapshot of Company Name
-  targetUserName?: string; // Snapshot of User Name (Designation)
-  targetPartyDisplay?: string; // Legacy/Backup Snapshot
-  pol: string; // Port of Loading
-  pod: string; // Port of Discharge
+  targetPartyId?: string;
+  targetPartyName?: string;
+  targetUserName?: string;
+  targetPartyDisplay?: string;
+  pol: string;
+  pod: string;
   loadType: LoadType;
   cargoDetail: string;
   quantity: number;
   matrix: InquiryMatrix;
-  shipmentSchedule: string; // ISO Date String (Start)
-  shipmentScheduleEnd: string; // ISO Date String (End)
+  shipmentSchedule: string;
+  shipmentScheduleEnd: string;
   isHazardous: boolean;
   hazardousDetail?: string;
-  validUntil: string; // ISO String Date only
+  validUntil: string;
   status: 'LIVE' | 'EXPIRED' | 'SUSPENDED' | 'REJECTED';
   createdAt: string;
   createdBy: string;
 }
-
-// --- OFFER TYPES ---
 
 export type OfferType = 'GENERAL' | 'SPECIFIC';
 export type OfferGroup = 'GLOBAL' | 'NETWORK' | 'NETWORK_PARTY' | 'INTERNAL_PARTY';
@@ -151,36 +170,77 @@ export interface Offer {
   offerNumber: string;
   offerType: OfferType;
   offerGroup: OfferGroup;
-  
   targetPartyId?: string;
   targetPartyName?: string;
   targetUserName?: string;
   targetPartyDisplay?: string;
-
   pol: string;
   pod: string;
   transitPort: string;
-
   loadType: LoadType;
   cargoDetail: string;
   quantity: number;
   matrix: InquiryMatrix;
-  freightRate: number; // Base Freight Rate in USD
-  shipmentSchedule: string; // Weekly schedule string
-  
+  freightRate: number;
+  shipmentSchedule: string;
   isHazardous: boolean;
   hazardousDetail?: string;
-
   charges: ChargeItem[];
-  
   vesselName: string;
   voyage: string;
-  gateCloseDate: string; // ISO Date only
-  validUntil: string; // ISO Date Time
-
+  gateCloseDate: string;
+  validUntil: string;
   status: 'LIVE' | 'EXPIRED' | 'SUSPENDED' | 'ACCEPTED' | 'REJECTED';
   createdAt: string;
   createdBy: string;
 }
 
-export type AuthState = 'LOGIN_EMAIL' | 'LOGIN_OTP' | 'SIGNUP' | 'DASHBOARD';
+// --- BOOKING TYPES ---
+
+export type BookingStatus = 
+  'PENDING' | 
+  'CREATED' | 
+  'DO_ISSUED' | 
+  'CUSTOM_CLEARANCE' | 
+  'CARGO_LOAD' | 
+  'GATE_IN' | 
+  'GATE_CLOSE' | 
+  'VESSEL_SAILED' | 
+  'LOAD_DISCHARGED';
+
+export interface Booking {
+  id: string;
+  bookingRef: string; // Carrier Booking Reference. 'PENDING' until created.
+  
+  // Linked Offer & Copy of Data (Snapshot)
+  offerId: string;
+  offerNumber: string;
+  pol: string;
+  pod: string;
+  loadType: string;
+  quantity: number;
+  commodity: string;
+  vesselName: string;
+  voyage: string;
+  
+  // Parties
+  providerUser: string; // Creator of the Offer (Service Provider)
+  clientUser: string;   // Acceptor of the Offer (Client)
+  clientName: string;   // Snapshot Name of Client
+  
+  // Carrier Info
+  shippingLine: string;
+
+  status: BookingStatus;
+  createdAt: string;
+  updatedAt: string;
+  
+  timeline: {
+    status: BookingStatus;
+    date: string;
+    updatedBy: string;
+    remarks?: string;
+  }[];
+}
+
+export type AuthState = 'LOGIN_EMAIL' | 'LOGIN_PASS' | 'LOGIN_OTP' | 'SIGNUP' | 'DASHBOARD' | 'ADMIN_PANEL' | 'SUBSCRIPTION_EXPIRED';

@@ -10,9 +10,10 @@ interface OfferListProps {
   onCreateNew: () => void;
   onRevise: (offer: Offer) => void;
   currentUser: UserProfile;
+  onViewProfile?: (profile: Partial<UserProfile>) => void;
 }
 
-export const OfferList: React.FC<OfferListProps> = ({ onBack, onCreateNew, onRevise, currentUser }) => {
+export const OfferList: React.FC<OfferListProps> = ({ onBack, onCreateNew, onRevise, currentUser, onViewProfile }) => {
   const [offers, setOffers] = useState<Offer[]>([]);
   const [displayedOffers, setDisplayedOffers] = useState<Offer[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -277,9 +278,9 @@ export const OfferList: React.FC<OfferListProps> = ({ onBack, onCreateNew, onRev
                                          <div className="col-span-1">
                                             <p className="text-ocean-500 font-bold uppercase mb-2">Vessel & Schedule</p>
                                             <div className="flex flex-col gap-1.5">
-                                               <div className="flex items-center"><Anchor className="w-3.5 h-3.5 mr-2 text-indigo-400"/> <span className="text-white font-bold">{offer.vesselName}</span></div>
+                                               <div className="flex items-center"><Anchor className="w-3.5 h-3.5 mr-2 text-emerald-400"/> <span className="text-white font-bold">{offer.vesselName}</span></div>
                                                <div className="pl-5 text-ocean-400">Voyage: {offer.voyage || '-'}</div>
-                                               <div className="flex items-center mt-2"><Clock className="w-3.5 h-3.5 mr-2 text-indigo-400"/> <span className="text-white">Schedule: {offer.shipmentSchedule || '-'}</span></div>
+                                               <div className="flex items-center mt-2"><Clock className="w-3.5 h-3.5 mr-2 text-emerald-400"/> <span className="text-white">Schedule: {offer.shipmentSchedule || '-'}</span></div>
                                             </div>
                                          </div>
                                          {/* Section 2: Reference & Cargo */}

@@ -4,13 +4,15 @@ import { Home, User, Mail, Smartphone, Plus, Shield, CheckCircle, Loader2, Brief
 import { SubUser, UserRole, Branch, UserProfile } from '../types';
 import { masterService } from '../services/masterService';
 import { authService } from '../services/authService';
+import { adminService } from '../services/adminService';
 
 interface SubUserMasterProps {
   onBack: () => void;
   currentUser: UserProfile;
+  onViewProfile?: (profile: Partial<UserProfile>) => void;
 }
 
-export const SubUserMaster: React.FC<SubUserMasterProps> = ({ onBack, currentUser }) => {
+export const SubUserMaster: React.FC<SubUserMasterProps> = ({ onBack, currentUser, onViewProfile }) => {
   const [view, setView] = useState<'LIST' | 'CREATE'>('LIST');
   const [subUsers, setSubUsers] = useState<SubUser[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
@@ -43,7 +45,37 @@ export const SubUserMaster: React.FC<SubUserMasterProps> = ({ onBack, currentUse
     loadData();
   };
 
+  const handleProfileClick = (user: SubUser) => {
+    if (onViewProfile) {
+        onViewProfile({
+            fullName: user.fullName,
+            email: user.email,
+            mobile: user.mobile,
+            role: user.role,
+            designation: user.designation,
+            photoBase64: user.photoBase64,
+            companyName: currentUser.companyName,
+            isMainUser: false,
+            // Additional details if available
+        });
+    }
+  };
+
   // --- Logic for Creation ---
+  const handleStartCreate = () => {
+      // Check Plan Limit
+      const mySubUsers = subUsers.filter(u => u.createdBy === 'main' || u.createdBy === currentUser.email);
+      const limit = adminService.getPermission(currentUser.plan).maxSubUsers;
+      
+      if (mySubUsers.length >= limit) {
+          alert(`You have reached the maximum number of sub-users (${limit}) allowed on your ${currentUser.plan} plan. Upgrade to add more.`);
+          return;
+      }
+
+      resetForm();
+      setView('CREATE');
+  };
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -108,7 +140,12 @@ export const SubUserMaster: React.FC<SubUserMasterProps> = ({ onBack, currentUse
       logoBase64: currentUser.logoBase64 || null,
       isMainUser: false, // Explicitly false for sub-users
       branchId: formData.branchId,
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      // Inherit subscription from main user (required by UserProfile type)
+      plan: currentUser.plan,
+      subscriptionStatus: currentUser.subscriptionStatus,
+      registrationDate: currentUser.registrationDate,
+      expiryDate: currentUser.expiryDate
     };
     authService.registerUser(subUserProfile);
 
@@ -159,7 +196,7 @@ export const SubUserMaster: React.FC<SubUserMasterProps> = ({ onBack, currentUse
                    />
                 </div>
                 {canCreate && (
-                  <button onClick={() => { resetForm(); setView('CREATE'); }} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl font-medium flex items-center shadow-lg transition-all">
+                  <button onClick={handleStartCreate} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-2 rounded-xl font-medium flex items-center shadow-lg transition-all">
                     <Plus className="w-4 h-4 mr-2" /> Create Sub-User
                   </button>
                 )}
@@ -182,7 +219,7 @@ export const SubUserMaster: React.FC<SubUserMasterProps> = ({ onBack, currentUse
                        const branch = branches.find(b => b.id === user.branchId);
                        return (
                          <tr key={user.id} className="hover:bg-white/5 transition-colors">
-                            <td className="px-6 py-4 text-white">
+                            <td className="px-6 py-4 text-white cursor-pointer" onClick={() => handleProfileClick(user)}>
                               <div className="flex items-center space-x-3">
                                 <div className="w-10 h-10 rounded-full bg-ocean-800 border border-ocean-600 overflow-hidden shrink-0 flex items-center justify-center">
                                   {user.photoBase64 ? (
@@ -192,7 +229,7 @@ export const SubUserMaster: React.FC<SubUserMasterProps> = ({ onBack, currentUse
                                   )}
                                 </div>
                                 <div>
-                                  <div className="font-medium">{user.fullName}</div>
+                                  <div className="font-medium hover:text-orange-400 transition-colors underline decoration-dotted decoration-ocean-600 underline-offset-4">{user.fullName}</div>
                                   <div className="text-[11px] text-ocean-400 flex items-center mt-0.5">
                                     <Briefcase className="w-3 h-3 mr-1 opacity-70" />
                                     {user.designation}

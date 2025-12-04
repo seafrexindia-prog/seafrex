@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Home, MessageSquare, Send, Upload, User, Building2, Globe, Users, X } from 'lucide-react';
+import { Home, MessageSquare, Send, Upload, User, Building2, Globe, Users, X, Shield } from 'lucide-react';
 import { EcrmTicket, UserProfile } from '../types';
 import { ecrmService } from '../services/ecrmService';
 import { partyService } from '../services/partyService';
@@ -13,7 +13,7 @@ interface ECRMFormProps {
 
 export const ECRMForm: React.FC<ECRMFormProps> = ({ onBack, onSaveSuccess, currentUser }) => {
   const [ticketId, setTicketId] = useState('');
-  const [partyType, setPartyType] = useState<'NETWORK' | 'INTERNAL'>('NETWORK');
+  const [partyType, setPartyType] = useState<'NETWORK' | 'INTERNAL' | 'ADMIN'>('NETWORK');
   const [selectedParty, setSelectedParty] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
@@ -41,9 +41,11 @@ export const ECRMForm: React.FC<ECRMFormProps> = ({ onBack, onSaveSuccess, curre
     if (partyType === 'INTERNAL') {
       const p = internalParties.find(i => i.id === selectedParty);
       pName = p ? `${p.contactPerson} (${p.companyName})` : 'Unknown Internal';
-    } else {
+    } else if (partyType === 'NETWORK') {
       const p = networkParties.find(n => n.id === selectedParty);
       pName = p ? p.name : 'Unknown Network';
+    } else if (partyType === 'ADMIN') {
+        pName = 'SEAFREX (Admin)';
     }
 
     // Determine createdBy: if main user then 'main', else email
@@ -62,7 +64,8 @@ export const ECRMForm: React.FC<ECRMFormProps> = ({ onBack, onSaveSuccess, curre
       history: [
         { date: new Date().toLocaleString(), action: 'Ticket Created', by: 'You' }
       ],
-      createdBy: creator
+      createdBy: creator,
+      targetAdmin: partyType === 'ADMIN' // Set flag for admin
     };
 
     ecrmService.createTicket(newTicket);
@@ -108,47 +111,57 @@ export const ECRMForm: React.FC<ECRMFormProps> = ({ onBack, onSaveSuccess, curre
             {/* Party Selection Type */}
             <div className="space-y-3">
               <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider">Select Party Type</label>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   type="button"
                   onClick={() => { setPartyType('NETWORK'); setSelectedParty(''); }}
-                  className={`p-4 rounded-xl border flex flex-col items-center justify-center transition-all ${partyType === 'NETWORK' ? 'bg-rose-600 text-white border-rose-500 shadow-lg' : 'bg-black/20 text-ocean-400 border-ocean-700 hover:bg-white/5'}`}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${partyType === 'NETWORK' ? 'bg-rose-600 text-white border-rose-500 shadow-lg' : 'bg-black/20 text-ocean-400 border-ocean-700 hover:bg-white/5'}`}
                 >
-                  <Globe className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Network Party</span>
+                  <Globe className="w-5 h-5 mb-1" />
+                  <span className="text-xs font-bold">Network Party</span>
                 </button>
                 <button
                   type="button"
                   onClick={() => { setPartyType('INTERNAL'); setSelectedParty(''); }}
-                  className={`p-4 rounded-xl border flex flex-col items-center justify-center transition-all ${partyType === 'INTERNAL' ? 'bg-rose-600 text-white border-rose-500 shadow-lg' : 'bg-black/20 text-ocean-400 border-ocean-700 hover:bg-white/5'}`}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${partyType === 'INTERNAL' ? 'bg-rose-600 text-white border-rose-500 shadow-lg' : 'bg-black/20 text-ocean-400 border-ocean-700 hover:bg-white/5'}`}
                 >
-                  <Users className="w-6 h-6 mb-2" />
-                  <span className="text-sm font-semibold">Internal Party</span>
+                  <Users className="w-5 h-5 mb-1" />
+                  <span className="text-xs font-bold">Internal Party</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setPartyType('ADMIN'); setSelectedParty('admin'); }}
+                  className={`p-3 rounded-xl border flex flex-col items-center justify-center transition-all ${partyType === 'ADMIN' ? 'bg-rose-600 text-white border-rose-500 shadow-lg' : 'bg-black/20 text-ocean-400 border-ocean-700 hover:bg-white/5'}`}
+                >
+                  <Shield className="w-5 h-5 mb-1" />
+                  <span className="text-xs font-bold">SEAFREX (Admin)</span>
                 </button>
               </div>
             </div>
 
             {/* Dynamic Dropdown */}
-            <div className="space-y-2">
-               <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider">Select Party</label>
-               <select 
-                 required
-                 value={selectedParty}
-                 onChange={(e) => setSelectedParty(e.target.value)}
-                 className="w-full bg-black/20 border border-ocean-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 outline-none transition-all appearance-none"
-               >
-                 <option value="" disabled>-- Choose {partyType === 'NETWORK' ? 'Network' : 'Internal'} Party --</option>
-                 {partyType === 'INTERNAL' ? (
-                    internalParties.map(p => (
-                      <option key={p.id} value={p.id}>{p.contactPerson} - {p.companyName}</option>
-                    ))
-                 ) : (
-                    networkParties.map(p => (
-                      <option key={p.id} value={p.id}>{p.name}</option>
-                    ))
-                 )}
-               </select>
-            </div>
+            {partyType !== 'ADMIN' && (
+                <div className="space-y-2">
+                   <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider">Select Party</label>
+                   <select 
+                     required
+                     value={selectedParty}
+                     onChange={(e) => setSelectedParty(e.target.value)}
+                     className="w-full bg-black/20 border border-ocean-700 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-rose-500/50 focus:border-rose-500 outline-none transition-all appearance-none"
+                   >
+                     <option value="" disabled>-- Choose {partyType === 'NETWORK' ? 'Network' : 'Internal'} Party --</option>
+                     {partyType === 'INTERNAL' ? (
+                        internalParties.map(p => (
+                          <option key={p.id} value={p.id}>{p.contactPerson} - {p.companyName}</option>
+                        ))
+                     ) : (
+                        networkParties.map(p => (
+                          <option key={p.id} value={p.id}>{p.name}</option>
+                        ))
+                     )}
+                   </select>
+                </div>
+            )}
 
             {/* Subject */}
             <div className="space-y-2">
@@ -204,15 +217,15 @@ export const ECRMForm: React.FC<ECRMFormProps> = ({ onBack, onSaveSuccess, curre
               <button 
                 type="button" 
                 onClick={onBack}
-                className="px-6 py-3 text-ocean-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium"
+                className="px-6 py-2 text-ocean-300 hover:text-white hover:bg-white/5 rounded-xl transition-colors font-medium text-sm"
               >
                 Cancel
               </button>
               <button 
                 type="submit" 
-                className="px-8 py-3 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center"
+                className="px-6 py-2 bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-500 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transform hover:scale-[1.02] transition-all flex items-center text-sm"
               >
-                <Send className="w-5 h-5 mr-2" />
+                <Send className="w-4 h-4 mr-2" />
                 Submit Ticket
               </button>
             </div>

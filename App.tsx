@@ -1,9 +1,12 @@
+
 import React, { useState, useEffect } from 'react';
 import { AuthState, UserProfile } from './types';
 import { authService } from './services/authService';
 import { LoginForm } from './components/LoginForm';
 import { SignupForm } from './components/SignupForm';
 import { Dashboard } from './components/Dashboard';
+import { AdminPanel } from './components/AdminPanel';
+import { SubscriptionPage } from './components/SubscriptionPage';
 
 const App: React.FC = () => {
   const [view, setView] = useState<AuthState>('LOGIN_EMAIL');
@@ -14,20 +17,23 @@ const App: React.FC = () => {
   useEffect(() => {
     const user = authService.getCurrentUser();
     if (user) {
-      setCurrentUser(user);
-      setView('DASHBOARD');
+      // Check for expiry on reload
+      if (new Date(user.expiryDate) < new Date()) {
+          setTempEmail(user.email);
+          setView('SUBSCRIPTION_EXPIRED');
+      } else {
+          setCurrentUser(user);
+          setView('DASHBOARD');
+      }
     }
   }, []);
 
   const handleLoginSuccess = (email: string) => {
-    // In a real app, verifyOtp would return the user object or token. 
-    // Here we mocked checking the "DB" in authService.
     const user = authService.loginUser(email);
     if (user) {
       setCurrentUser(user);
       setView('DASHBOARD');
     } else {
-      // Should not happen if logic flows correctly, but fallback
       alert("User record missing locally. Please sign up.");
       setTempEmail(email);
       setView('SIGNUP');
@@ -44,6 +50,10 @@ const App: React.FC = () => {
     setView('DASHBOARD');
   };
 
+  const handleAdminLogin = () => {
+      setView('ADMIN_PANEL');
+  };
+
   const handleLogout = () => {
     authService.logout();
     setCurrentUser(null);
@@ -56,24 +66,51 @@ const App: React.FC = () => {
     setTempEmail('');
   };
 
+  const handleSubscriptionExpired = (email: string) => {
+      setTempEmail(email);
+      setView('SUBSCRIPTION_EXPIRED');
+  };
+
+  const handleSubscriptionSuccess = () => {
+      const user = authService.getUser(tempEmail);
+      if (user) {
+          authService.loginUser(user);
+          setCurrentUser(user);
+          setView('DASHBOARD');
+      }
+  };
+
   return (
-    <div className="min-h-screen bg-ocean-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-ocean-800 via-ocean-950 to-black text-white flex items-center justify-center relative overflow-hidden">
+    <div className={`min-h-screen ${view === 'ADMIN_PANEL' ? 'bg-slate-950' : 'bg-ocean-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-ocean-800 via-ocean-950 to-black'} text-white flex items-center justify-center relative overflow-hidden`}>
       
-      {/* Ambient Background Effects */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none" />
+      {/* Ambient Background Effects (Not for Dashboard/Admin which take full width) */}
+      {view !== 'DASHBOARD' && view !== 'ADMIN_PANEL' && (
+        <>
+            <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-600/20 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-cyan-600/10 rounded-full blur-[120px] pointer-events-none" />
+        </>
+      )}
 
       {view === 'DASHBOARD' && currentUser ? (
-          // Dashboard takes full screen, remove generic layout constraints
           <div className="w-full h-screen z-10">
             <Dashboard user={currentUser} onLogout={handleLogout} />
           </div>
+        ) : view === 'ADMIN_PANEL' ? (
+          <div className="w-full h-screen z-10">
+            <AdminPanel onLogout={handleLogout} />
+          </div>
+        ) : view === 'SUBSCRIPTION_EXPIRED' ? (
+          <div className="w-full h-screen z-10 overflow-y-auto">
+            <SubscriptionPage userEmail={tempEmail} onSuccess={handleSubscriptionSuccess} onLogout={handleLogout} />
+          </div>
         ) : (
           <main className="relative z-10 w-full flex justify-center p-4">
-            {view === 'LOGIN_EMAIL' || view === 'LOGIN_OTP' ? (
+            {(view === 'LOGIN_EMAIL' || view === 'LOGIN_OTP' || view === 'LOGIN_PASS') ? (
               <LoginForm 
                 onLoginSuccess={handleLoginSuccess}
                 onUserNotFound={handleUserNotFound}
+                onAdminLogin={handleAdminLogin}
+                onSubscriptionExpired={handleSubscriptionExpired}
               />
             ) : view === 'SIGNUP' ? (
               <SignupForm 
@@ -91,7 +128,7 @@ const App: React.FC = () => {
       )}
 
       {/* Footer only on login/signup screens */}
-      {view !== 'DASHBOARD' && (
+      {(view === 'LOGIN_EMAIL' || view === 'LOGIN_OTP' || view === 'LOGIN_PASS' || view === 'SIGNUP') && (
         <footer className="absolute bottom-4 w-full text-center text-xs text-ocean-600/50">
           &copy; {new Date().getFullYear()} Seafrex.in. Secure Logistics Portal.
         </footer>

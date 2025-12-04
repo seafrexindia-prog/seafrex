@@ -1,10 +1,11 @@
 
-import { Branch, SubUser, UserRole, ChargeHead } from '../types';
+import { Branch, SubUser, UserRole, ChargeHead, ShippingLine } from '../types';
 import { authService } from './authService';
 
 const STORAGE_KEY_BRANCH = 'ocean_branches';
 const STORAGE_KEY_SUBUSERS = 'ocean_subusers';
 const STORAGE_KEY_CHARGES = 'ocean_charges';
+const STORAGE_KEY_SHIPPING = 'ocean_shipping_lines';
 
 // Initial Mock Data
 const INITIAL_BRANCHES: Branch[] = [
@@ -27,6 +28,12 @@ const INITIAL_CHARGES: ChargeHead[] = [
     ],
     createdBy: 'main'
   }
+];
+
+const INITIAL_SHIPPING_LINES: ShippingLine[] = [
+  { id: 'sl1', lineName: 'Maersk Line', unitName: 'MAEU', country: 'Denmark', status: 'ACTIVE', createdBy: 'main' },
+  { id: 'sl2', lineName: 'MSC', unitName: 'MSCU', country: 'Switzerland', status: 'ACTIVE', createdBy: 'main' },
+  { id: 'sl3', lineName: 'CMA CGM', unitName: 'CMDU', country: 'France', status: 'ACTIVE', createdBy: 'main' }
 ];
 
 export const masterService = {
@@ -118,6 +125,36 @@ export const masterService = {
   deleteChargeHead: (id: string): void => {
     const heads = masterService.getChargeHeads().filter(h => h.id !== id);
     localStorage.setItem(STORAGE_KEY_CHARGES, JSON.stringify(heads));
+  },
+
+  // --- Shipping Lines ---
+  getShippingLines: (): ShippingLine[] => {
+    const data = localStorage.getItem(STORAGE_KEY_SHIPPING);
+    if (!data) {
+      localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(INITIAL_SHIPPING_LINES));
+      return INITIAL_SHIPPING_LINES;
+    }
+    return JSON.parse(data);
+  },
+
+  saveShippingLine: (line: ShippingLine): void => {
+    const lines = masterService.getShippingLines();
+    const index = lines.findIndex(l => l.id === line.id);
+    if (index >= 0) {
+      lines[index] = line;
+    } else {
+      lines.push(line);
+    }
+    localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(lines));
+  },
+
+  toggleShippingLineStatus: (id: string): void => {
+    const lines = masterService.getShippingLines();
+    const line = lines.find(l => l.id === id);
+    if (line) {
+      line.status = line.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+      localStorage.setItem(STORAGE_KEY_SHIPPING, JSON.stringify(lines));
+    }
   },
 
   // Mock verification

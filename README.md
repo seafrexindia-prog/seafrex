@@ -1,36 +1,20 @@
-# Seafrex Logistics Portal 🚢
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
+</div>
 
-A modern, secure logistics management portal designed for shippers, forwarders, and liner operators. This single-page application (SPA) features real-time inquiry management, offer tracking, booking workflows, and an AI-powered onboarding assistant.
+# Run and deploy your AI Studio app
 
-![License](https://img.shields.io/badge/license-MIT-blue.svg)
-![React](https://img.shields.io/badge/React-19-blue)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue)
+This contains everything you need to run your app locally.
 
-## 🌟 Features
+View your app in AI Studio: https://ai.studio/apps/drive/1llk0ql3xZqiMtIREF4F4PZLsBsyG-G29
 
-- **Role-Based Access**: Specialized dashboards for Exporters, Forwarders, and Liners.
-- **Booking Management**: Complete workflow from Inquiry -> Offer -> Booking -> Shipment Tracking.
-- **Strict Status Workflow**: Enforced state transitions for booking lifecycle (Pending -> Created -> DO Issued, etc.).
-- **ECRM Support**: Integrated ticketing system for internal and network communication.
-- **AI Integration**: Onboarding analysis using Google Gemini API.
-- **Responsive Design**: Built with Tailwind CSS for seamless mobile and desktop experience.
+## Run Locally
 
-## 🚀 Live Demo
+**Prerequisites:**  Node.js
 
-Check out the live application here:  
-**[https://seafrex-prog.github.io/seafrex](https://seafrex-prog.github.io/seafrex)**
 
-## 🛠️ Installation & Setup
-
-To run this project locally, follow these steps:
-
-### Prerequisites
-- Node.js (v16 or higher)
-- npm or yarn
-
-### Steps
-
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/seafrex-prog/seafrex.git
-   cd seafrex
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

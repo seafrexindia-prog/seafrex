@@ -10,13 +10,14 @@ interface ECRMListProps {
   onCreateNew: () => void;
   onSelectTicket: (ticketId: string) => void;
   currentUser?: UserProfile;
+  onViewProfile?: (profile: Partial<UserProfile>) => void;
 }
 
-export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelectTicket, currentUser }) => {
+export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelectTicket, currentUser, onViewProfile }) => {
   const [tickets, setTickets] = useState<EcrmTicket[]>([]);
   const [displayedTickets, setDisplayedTickets] = useState<EcrmTicket[]>([]);
   const [activeTab, setActiveTab] = useState<'SENT' | 'RECEIVED'>('RECEIVED');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'REPLIED' | 'RESOLVED'>('PENDING');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'PENDING' | 'RESOLVED'>('PENDING');
   const [selectedHistory, setSelectedHistory] = useState<EcrmTicket | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -73,6 +74,8 @@ export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelec
           setIsLoading(false);
     }, 300);
   };
+
+  const formatDate = (date: string) => new Date(date).toLocaleDateString('en-GB');
 
   return (
     <div className="flex flex-col h-full w-full bg-ocean-950/80 overflow-hidden animate-fade-in-up relative">
@@ -157,7 +160,7 @@ export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelec
 
              <button 
                onClick={onCreateNew}
-               className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl font-medium flex items-center shadow-lg shadow-rose-900/20 transition-all hover:scale-105 h-10 whitespace-nowrap w-full sm:w-auto justify-center"
+               className="bg-rose-600 hover:bg-rose-500 text-white px-4 py-2 rounded-xl font-medium flex items-center shadow-lg shadow-rose-900/20 transition-all hover:scale-105 h-10 whitespace-nowrap w-full sm:w-auto justify-center text-sm"
              >
                <MessageSquare className="w-4 h-4 mr-2" />
                Create Ticket
@@ -168,7 +171,7 @@ export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelec
         {/* Filter Bar */}
         <div className="flex items-center space-x-2 overflow-x-auto custom-scrollbar pb-2">
            <Filter className="w-4 h-4 text-ocean-500 mr-2 shrink-0" />
-           {['PENDING', 'ALL', 'REPLIED', 'RESOLVED'].map((status) => (
+           {['PENDING', 'ALL', 'RESOLVED'].map((status) => (
              <button
                key={status}
                onClick={() => setStatusFilter(status as any)}
@@ -206,7 +209,7 @@ export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelec
                             <td className="px-6 py-4 font-mono text-ocean-300 text-xs">
                               {ticket.ticketNumber}
                             </td>
-                            <td className="px-6 py-4 text-ocean-300">{ticket.date}</td>
+                            <td className="px-6 py-4 text-ocean-300">{formatDate(ticket.date)}</td>
                             <td className="px-6 py-4">
                                <div className="flex flex-col">
                                   <span className="text-white font-medium">{ticket.partyName}</span>
@@ -216,14 +219,11 @@ export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelec
                             <td className="px-6 py-4 text-ocean-100 font-medium">{ticket.subject}</td>
                             <td className="px-6 py-4">
                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border
-                                 ${ticket.status === 'PENDING' ? 'bg-amber-900/20 text-amber-400 border-amber-900/30' : 
-                                   ticket.status === 'RESOLVED' ? 'bg-emerald-900/20 text-emerald-400 border-emerald-900/30' :
-                                   'bg-blue-900/20 text-blue-400 border-blue-900/30'
+                                 ${ticket.status === 'RESOLVED' ? 'bg-emerald-900/20 text-emerald-400 border-emerald-900/30' :
+                                   'bg-amber-900/20 text-amber-400 border-amber-900/30'
                                  }
                                `}>
-                                 {ticket.status === 'PENDING' && <Clock className="w-3 h-3 mr-1" />}
-                                 {ticket.status === 'RESOLVED' && <CheckCircle className="w-3 h-3 mr-1" />}
-                                 {ticket.status === 'REPLIED' && <ArrowUpRight className="w-3 h-3 mr-1" />}
+                                 {ticket.status === 'RESOLVED' ? <CheckCircle className="w-3 h-3 mr-1" /> : <Clock className="w-3 h-3 mr-1" />}
                                  {ticket.status}
                                </span>
                             </td>
@@ -256,7 +256,7 @@ export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelec
                               <MessageSquare className="w-8 h-8 mb-2 opacity-50" />
                               <p>No tickets found. Click GO to refresh.</p>
                            </div>
-                        </td>
+                         </td>
                      </tr>
                  )}
               </tbody>
@@ -287,7 +287,7 @@ export const ECRMList: React.FC<ECRMListProps> = ({ onBack, onCreateNew, onSelec
                         <div className="w-[calc(100%-3rem)] md:w-[calc(50%-2.5rem)] p-3 rounded-xl border border-white/10 bg-white/5 shadow-sm">
                           <div className="flex items-center justify-between space-x-2 mb-1">
                             <span className="font-bold text-ocean-200 text-sm">{log.action}</span>
-                            <time className="font-mono text-[10px] text-ocean-500">{log.date}</time>
+                            <time className="font-mono text-[10px] text-ocean-500">{formatDate(log.date)}</time>
                           </div>
                           <div className="text-xs text-ocean-400">
                              By: <span className="text-cyan-400">{log.by}</span>

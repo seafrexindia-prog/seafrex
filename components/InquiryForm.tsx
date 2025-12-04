@@ -4,9 +4,9 @@ import { Home, Search, Calendar, Ship, MapPin, AlertTriangle, Box, Save, ArrowRi
 import { Inquiry, InquiryType, InquiryGroup, LoadType, InquiryMatrix, UserProfile } from '../types';
 import { inquiryService } from '../services/inquiryService';
 import { partyService } from '../services/partyService';
-import { masterService } from '../services/masterService';
+import { adminMasterService } from '../services/adminMasterService';
+import { adminService } from '../services/adminService';
 
-const MOCK_PORTS = ['Mundra (INMUN)', 'Jebel Ali (AEJEA)', 'Singapore (SGSIN)', 'Rotterdam (NLRTM)', 'Shanghai (CNSHA)', 'New York (USNYC)'];
 const MOCK_NETWORK_PARTIES = [
   { id: '1', name: 'Rahul Verma', designation: 'Senior Manager', company: 'Global Logistics Pvt Ltd' },
   { id: '2', name: 'Sarah Jenkins', designation: 'Director', company: 'Oceanic Freight' },
@@ -17,22 +17,16 @@ const MOCK_NETWORK_PARTIES = [
 const generateScheduleOptions = (): string[] => {
   const options: string[] = [];
   let currentDate = new Date();
-  
-  // We want to find 12 unique buckets starting from today
   while (options.length < 12) {
     const day = currentDate.getDate();
     const month = currentDate.toLocaleString('default', { month: 'short' }).toUpperCase();
     const year = currentDate.getFullYear().toString().slice(-2);
-    
     let prefix = '';
     if (day <= 7) prefix = '1ST';
     else if (day <= 14) prefix = '2ND';
     else if (day <= 21) prefix = '3RD';
     else prefix = 'LAST';
-
     const scheduleStr = `${prefix}-WEEK-${month}-${year}`;
-
-    // Add if it's new (not the same as the last added one)
     if (options.length === 0 || options[options.length - 1] !== scheduleStr) {
         options.push(scheduleStr);
     }
@@ -77,7 +71,7 @@ const PortSearchInput = ({
             value={value} 
             onChange={e => { onChange(e.target.value); setIsOpen(true); }}
             onFocus={() => !disabled && setIsOpen(true)}
-            onBlur={() => setIsOpen(false)}
+            onBlur={() => setTimeout(() => setIsOpen(false), 200)}
             className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl pl-9 pr-8 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-xs h-[38px] placeholder-ocean-500 transition-all ${disabled ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}
             placeholder="Search port..."
             autoComplete="off"
@@ -118,11 +112,10 @@ interface InquiryFormProps {
   onSaveSuccess: () => void;
   currentUser: UserProfile;
   initialData?: Inquiry | null;
-  isResponseMode?: boolean; // True when creating inquiry AGAINST an offer (Send Inquiry)
+  isResponseMode?: boolean; 
 }
 
 export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess, currentUser, initialData, isResponseMode = false }) => {
-  // Wizard State
   const [step, setStep] = useState<1 | 2>(1);
 
   // Form State
@@ -141,10 +134,25 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
   const [hazardousDetail, setHazardousDetail] = useState('');
   const [validUntil, setValidUntil] = useState('');
 
+  // Master Data States
+  const [portOptions, setPortOptions] = useState<string[]>([]);
+  const [loadTypeOptions, setLoadTypeOptions] = useState<string[]>([]);
+  const [matrixOptions, setMatrixOptions] = useState<string[]>([]);
+
   const internalParties = partyService.getParties();
   const scheduleOptions = generateScheduleOptions();
 
-  // Populate from Initial Data (Template)
+  useEffect(() => {
+    // Load Admin Masters
+    const p = adminMasterService.getPorts().map(p => `${p.name} (${p.shortName})`);
+    const l = adminMasterService.getLoadTypes().map(l => l.loadType);
+    const m = adminMasterService.getMatrices().map(mx => mx.name);
+    
+    setPortOptions(p);
+    setLoadTypeOptions(l);
+    setMatrixOptions(m);
+  }, []);
+
   useEffect(() => {
     if (initialData) {
         setInquiryType(initialData.inquiryType);
@@ -159,11 +167,9 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
         setShipmentSchedule(initialData.shipmentSchedule);
         setIsHazardous(initialData.isHazardous);
         setHazardousDetail(initialData.hazardousDetail || '');
-        // Do not pre-fill Valid Until as user needs to set validity of their inquiry
     }
   }, [initialData]);
 
-  // Reset dependent fields when type changes (Only if not in Response Mode)
   useEffect(() => {
     if (!isResponseMode && !initialData) {
         if (inquiryType === 'GENERAL') {
@@ -192,35 +198,37 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
   };
 
   const handleNext = () => {
-    if (validateStep1()) {
-      setStep(2);
-    }
+    if (validateStep1()) setStep(2);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
+    // --- DAILY LIMIT CHECK ---
+    const today = new Date().toISOString().split('T')[0];
+    const myInquiriesToday = inquiryService.getInquiries().filter(i => 
+       i.createdBy === (currentUser.email || 'main') && i.createdAt.startsWith(today)
+    ).length;
+    const limit = adminService.getPermission(currentUser.plan).maxDailyTransactions;
+    if (myInquiriesToday >= limit) {
+        alert(`Daily limit of ${limit} inquiries reached for your ${currentUser.plan} plan.`);
+        return;
+    }
+    // --------------------------
+
     let targetPartyName = initialData?.targetPartyName || '';
     let targetUserName = initialData?.targetUserName || '';
 
-    // If not in response mode, or if user changed selection (though usually locked in response mode)
     if (!isResponseMode || (!targetPartyName && targetPartyId)) {
         if (inquiryGroup === 'INTERNAL_PARTY') {
             const p = internalParties.find(p => p.id === targetPartyId);
-            if (p) {
-                targetPartyName = p.companyName;
-                targetUserName = `${p.contactPerson} (${p.designation})`;
-            }
+            if (p) { targetPartyName = p.companyName; targetUserName = `${p.contactPerson} (${p.designation})`; }
         } else if (inquiryGroup === 'NETWORK_PARTY') {
             const p = MOCK_NETWORK_PARTIES.find(p => p.id === targetPartyId);
-            if (p) {
-                targetPartyName = p.company;
-                targetUserName = `${p.name} (${p.designation})`;
-            }
+            if (p) { targetPartyName = p.company; targetUserName = `${p.name} (${p.designation})`; }
         }
     }
 
-    // Fallback for response mode if dropdown logic was skipped
     if (isResponseMode && initialData?.targetPartyDisplay) {
         if(!targetPartyName) targetPartyName = initialData.targetPartyName || 'Unknown';
         if(!targetUserName) targetUserName = initialData.targetUserName || 'Unknown';
@@ -234,8 +242,8 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
       inquiryType,
       inquiryGroup,
       targetPartyId: (inquiryType === 'SPECIFIC') ? targetPartyId : undefined,
-      targetPartyName: targetPartyName,
-      targetUserName: targetUserName,
+      targetPartyName,
+      targetUserName,
       targetPartyDisplay: targetUserName ? `${targetUserName} - ${targetPartyName}` : initialData?.targetPartyDisplay,
       pol,
       pod,
@@ -257,7 +265,6 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
     onSaveSuccess();
   };
 
-  // Locked state for fields that shouldn't change when replying to an offer
   const isLocked = isResponseMode;
 
   return (
@@ -280,23 +287,20 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
       <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar flex justify-center">
         <div className="w-full max-w-4xl bg-ocean-900/40 border border-white/10 rounded-2xl p-8 shadow-2xl">
           
-          {/* Progress Indicator */}
+          {/* Progress */}
           <div className="mb-8">
             <div className="flex items-center justify-between mb-2">
               <span className={`text-xs font-bold uppercase tracking-wider ${step >= 1 ? 'text-indigo-400' : 'text-ocean-600'}`}>Step 1: Scope & Route</span>
               <span className={`text-xs font-bold uppercase tracking-wider ${step >= 2 ? 'text-indigo-400' : 'text-ocean-600'}`}>Step 2: Cargo Details</span>
             </div>
             <div className="w-full h-2 bg-ocean-950 rounded-full overflow-hidden">
-              <div 
-                className="h-full bg-indigo-500 transition-all duration-300 ease-in-out" 
-                style={{ width: step === 1 ? '50%' : '100%' }} 
-              />
+              <div className="h-full bg-indigo-500 transition-all duration-300 ease-in-out" style={{ width: step === 1 ? '50%' : '100%' }} />
             </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-8">
             
-            {/* STEP 1: Configuration & Route (Merged) */}
+            {/* STEP 1 */}
             {step === 1 && (
               <div className="animate-fade-in-up">
                 <div className="bg-black/20 p-5 rounded-xl border border-white/5 space-y-4">
@@ -305,44 +309,27 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
                     {isLocked && <span className="ml-2 text-xs text-rose-400 font-normal italic flex items-center"><Lock className="w-3 h-3 mr-1"/> (Locked to Offer)</span>}
                   </h3>
                   
-                  {/* Row 1: Type & Group */}
+                  {/* Type & Group */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-ocean-300 uppercase tracking-wider">Inquiry Type</label>
                       <div className="flex bg-ocean-950 rounded-lg p-1 border border-ocean-700 h-[38px]">
-                          <button type="button" disabled={isLocked} onClick={() => setInquiryType('GENERAL')} className={`flex-1 text-xs font-medium rounded-md transition-all ${inquiryType === 'GENERAL' ? 'bg-indigo-600 text-white shadow' : 'text-ocean-400 hover:text-white'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            General
-                          </button>
-                          <button type="button" disabled={isLocked} onClick={() => setInquiryType('SPECIFIC')} className={`flex-1 text-xs font-medium rounded-md transition-all ${inquiryType === 'SPECIFIC' ? 'bg-indigo-600 text-white shadow' : 'text-ocean-400 hover:text-white'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                            Specific
-                          </button>
+                          <button type="button" disabled={isLocked} onClick={() => setInquiryType('GENERAL')} className={`flex-1 text-xs font-medium rounded-md transition-all ${inquiryType === 'GENERAL' ? 'bg-indigo-600 text-white shadow' : 'text-ocean-400 hover:text-white'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>General</button>
+                          <button type="button" disabled={isLocked} onClick={() => setInquiryType('SPECIFIC')} className={`flex-1 text-xs font-medium rounded-md transition-all ${inquiryType === 'SPECIFIC' ? 'bg-indigo-600 text-white shadow' : 'text-ocean-400 hover:text-white'} ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}`}>Specific</button>
                       </div>
                     </div>
-
                     <div className="space-y-1">
                       <label className="text-[10px] font-bold text-ocean-300 uppercase tracking-wider">Inquiry Group</label>
-                      <select 
-                        disabled={isLocked}
-                        value={inquiryGroup}
-                        onChange={(e) => setInquiryGroup(e.target.value as InquiryGroup)}
-                        className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none h-[38px] text-xs ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}
-                      >
+                      <select disabled={isLocked} value={inquiryGroup} onChange={(e) => setInquiryGroup(e.target.value as InquiryGroup)} className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none h-[38px] text-xs ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}>
                         {inquiryType === 'GENERAL' ? (
-                          <>
-                            <option value="GLOBAL">Global</option>
-                            <option value="NETWORK">My Network (All)</option>
-                          </>
-                        ) : (
-                          <>
-                            <option value="NETWORK_PARTY">Network Party</option>
-                            <option value="INTERNAL_PARTY">Internal Party</option>
-                          </>
+                          <> <option value="GLOBAL">Global</option> <option value="NETWORK">My Network (All)</option> </>) : (
+                          <> <option value="NETWORK_PARTY">Network Party</option> <option value="INTERNAL_PARTY">Internal Party</option> </>
                         )}
                       </select>
                     </div>
                   </div>
 
-                  {/* Row 2: Send To */}
+                  {/* Send To */}
                   <div className="space-y-1">
                     <label className="text-[10px] font-bold text-ocean-300 uppercase tracking-wider">Send To</label>
                     {isResponseMode ? (
@@ -357,45 +344,23 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
                           {inquiryGroup === 'GLOBAL' ? 'Broadcast to All Global Partners' : 'Broadcast to All My Network Connections'}
                         </div>
                     ) : (
-                        <select 
-                          required
-                          value={targetPartyId}
-                          onChange={(e) => setTargetPartyId(e.target.value)}
-                          className="w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-xs h-[38px]"
-                        >
+                        <select required value={targetPartyId} onChange={(e) => setTargetPartyId(e.target.value)} className="w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 text-white focus:ring-2 focus:ring-indigo-500 outline-none text-xs h-[38px]">
                           <option value="" disabled>Select {inquiryGroup === 'NETWORK_PARTY' ? 'Network' : 'Internal'} Party</option>
-                          {inquiryGroup === 'NETWORK_PARTY' 
-                            ? MOCK_NETWORK_PARTIES.map(p => <option key={p.id} value={p.id}>{p.name} - {p.company}</option>)
-                            : internalParties.map(p => <option key={p.id} value={p.id}>{p.contactPerson} - {p.companyName}</option>)
-                          }
+                          {inquiryGroup === 'NETWORK_PARTY' ? MOCK_NETWORK_PARTIES.map(p => <option key={p.id} value={p.id}>{p.name} - {p.company}</option>) : internalParties.map(p => <option key={p.id} value={p.id}>{p.contactPerson} - {p.companyName}</option>)}
                         </select>
                     )}
                   </div>
 
-                  {/* Row 3: Route (POL/POD) */}
+                  {/* Route */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      <PortSearchInput 
-                        label="Port of Loading (POL)"
-                        value={pol}
-                        onChange={setPol}
-                        options={MOCK_PORTS}
-                        iconColor="text-emerald-500"
-                        disabled={isLocked}
-                      />
-                      <PortSearchInput 
-                        label="Port of Discharge (POD)"
-                        value={pod}
-                        onChange={setPod}
-                        options={MOCK_PORTS}
-                        iconColor="text-rose-500"
-                        disabled={isLocked}
-                      />
+                      <PortSearchInput label="Port of Loading (POL)" value={pol} onChange={setPol} options={portOptions} iconColor="text-emerald-500" disabled={isLocked} />
+                      <PortSearchInput label="Port of Discharge (POD)" value={pod} onChange={setPod} options={portOptions} iconColor="text-rose-500" disabled={isLocked} />
                   </div>
                 </div>
               </div>
             )}
 
-            {/* STEP 2: Shipment Details */}
+            {/* STEP 2 */}
             {step === 2 && (
               <div className="animate-fade-in-up space-y-8">
                 <div className="bg-black/20 p-6 rounded-xl border border-white/5 space-y-6">
@@ -406,167 +371,70 @@ export const InquiryForm: React.FC<InquiryFormProps> = ({ onBack, onSaveSuccess,
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">
-                            Load Type
-                            {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}
-                        </label>
-                        <select 
-                          disabled={isLocked}
-                          value={loadType} onChange={(e) => setLoadType(e.target.value as LoadType)}
-                          className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}
-                        >
-                          <option value="20 Feet Box">20 Feet Box</option>
-                          <option value="40 Feet Box">40 Feet Box</option>
-                          <option value="40 Feet HC">40 Feet HC</option>
-                          <option value="LCL">LCL</option>
-                          <option value="Bulk">Bulk</option>
+                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">Load Type {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}</label>
+                        <select disabled={isLocked} value={loadType} onChange={(e) => setLoadType(e.target.value as LoadType)} className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}>
+                          {loadTypeOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">
-                            Required Quantity
-                            {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}
-                        </label>
-                        <input 
-                          type="number" min="1" required disabled={isLocked}
-                          value={quantity} onChange={e => setQuantity(parseInt(e.target.value))}
-                          className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}
-                        />
+                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">Quantity {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}</label>
+                        <input type="number" min="1" required disabled={isLocked} value={quantity} onChange={e => setQuantity(parseInt(e.target.value))} className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`} />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">
-                            Matrix
-                            {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}
-                        </label>
-                        <select 
-                          disabled={isLocked}
-                          value={matrix} onChange={(e) => setMatrix(e.target.value as InquiryMatrix)}
-                          className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}
-                        >
-                          <option value="Container">Container</option>
-                          <option value="Box">Box</option>
-                          <option value="Tone">Tone</option>
-                          <option value="Kgs">Kgs</option>
+                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">Matrix {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}</label>
+                        <select disabled={isLocked} value={matrix} onChange={(e) => setMatrix(e.target.value as InquiryMatrix)} className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}>
+                          {matrixOptions.map(opt => <option key={opt} value={opt}>{opt}</option>)}
                         </select>
                       </div>
                   </div>
 
-                  {/* Cargo Detail and Schedule Row */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">
-                            Cargo Details
-                            {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}
-                        </label>
-                        <textarea 
-                          required rows={1} disabled={isLocked}
-                          value={cargoDetail} onChange={e => setCargoDetail(e.target.value)}
-                          className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}
-                          placeholder="E.g. Rice Bags"
-                        />
+                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center justify-between">Cargo Details {isLocked && <Lock className="w-3 h-3 text-ocean-500" />}</label>
+                        <textarea required rows={1} disabled={isLocked} value={cargoDetail} onChange={e => setCargoDetail(e.target.value)} className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none resize-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`} placeholder="E.g. Rice Bags" />
                     </div>
-                    
-                    {/* Shipment Schedule Dropdown */}
                     <div className="space-y-2">
-                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center">
-                            <Clock className="w-3 h-3 mr-1" /> Shipment Schedule
-                            {isLocked && <Lock className="w-3 h-3 text-ocean-500 ml-2" />}
-                        </label>
-                        <select 
-                          required disabled={isLocked}
-                          value={shipmentSchedule} 
-                          onChange={e => setShipmentSchedule(e.target.value)}
-                          className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white text-xs focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}
-                        >
+                        <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center"><Clock className="w-3 h-3 mr-1" /> Shipment Schedule {isLocked && <Lock className="w-3 h-3 text-ocean-500 ml-2" />}</label>
+                        <select required disabled={isLocked} value={shipmentSchedule} onChange={e => setShipmentSchedule(e.target.value)} className={`w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white text-xs focus:ring-2 focus:ring-indigo-500 outline-none ${isLocked ? 'opacity-60 cursor-not-allowed bg-ocean-900/30' : ''}`}>
                            <option value="" disabled>Select Schedule</option>
-                           {scheduleOptions.map((opt, idx) => (
-                             <option key={idx} value={opt}>{opt}</option>
-                           ))}
+                           {scheduleOptions.map((opt, idx) => <option key={idx} value={opt}>{opt}</option>)}
                         </select>
                     </div>
                   </div>
 
-                  {/* Hazardous & Validity Section */}
                   <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6">
-                      
-                      {/* Hazardous Toggle */}
                       <div className="space-y-4">
                           <div className="flex items-center space-x-4">
-                              <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center">
-                                Hazardous ? {isLocked && <Lock className="w-3 h-3 text-ocean-500 ml-2" />}
-                              </label>
+                              <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center">Hazardous ? {isLocked && <Lock className="w-3 h-3 text-ocean-500 ml-2" />}</label>
                               <div className={`flex items-center space-x-4 bg-ocean-950 px-3 py-1 rounded-lg border border-ocean-700 ${isLocked ? 'opacity-60 pointer-events-none' : ''}`}>
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input type="radio" checked={!isHazardous} onChange={() => setIsHazardous(false)} className="text-indigo-500 focus:ring-indigo-500" />
-                                    <span className="text-sm text-white">No</span>
-                                </label>
-                                <label className="flex items-center space-x-2 cursor-pointer">
-                                    <input type="radio" checked={isHazardous} onChange={() => setIsHazardous(true)} className="text-indigo-500 focus:ring-indigo-500" />
-                                    <span className="text-sm text-white">Yes</span>
-                                </label>
+                                <label className="flex items-center space-x-2 cursor-pointer"><input type="radio" checked={!isHazardous} onChange={() => setIsHazardous(false)} className="text-indigo-500" /><span className="text-sm text-white">No</span></label>
+                                <label className="flex items-center space-x-2 cursor-pointer"><input type="radio" checked={isHazardous} onChange={() => setIsHazardous(true)} className="text-indigo-500" /><span className="text-sm text-white">Yes</span></label>
                               </div>
                           </div>
-                          
                           {isHazardous && (
                             <div className="animate-fade-in-up">
-                                <label className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center mb-2">
-                                  <AlertTriangle className="w-3 h-3 mr-1" /> Hazardous Details
-                                </label>
-                                <textarea 
-                                  required rows={2} disabled={isLocked}
-                                  value={hazardousDetail} onChange={e => setHazardousDetail(e.target.value)}
-                                  className={`w-full bg-rose-950/10 border border-rose-900/50 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-rose-500 outline-none resize-none ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                  placeholder="UN Number, Class, etc..."
-                                />
+                                <label className="text-xs font-bold text-rose-400 uppercase tracking-wider flex items-center mb-2"><AlertTriangle className="w-3 h-3 mr-1" /> Hazardous Details</label>
+                                <textarea required rows={2} disabled={isLocked} value={hazardousDetail} onChange={e => setHazardousDetail(e.target.value)} className={`w-full bg-rose-950/10 border border-rose-900/50 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-rose-500 outline-none resize-none ${isLocked ? 'opacity-60 cursor-not-allowed' : ''}`} placeholder="UN Number, Class, etc..." />
                             </div>
                           )}
                       </div>
-
-                      {/* Valid Until */}
                       <div className="space-y-2">
-                          <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center">
-                             <Calendar className="w-3 h-3 mr-1" /> Valid Upto
-                          </label>
-                          <input 
-                            type="date" 
-                            required
-                            value={validUntil} onChange={e => setValidUntil(e.target.value)}
-                            className="w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none"
-                          />
+                          <label className="text-xs font-bold text-ocean-300 uppercase tracking-wider flex items-center"><Calendar className="w-3 h-3 mr-1" /> Valid Upto</label>
+                          <input type="date" required value={validUntil} onChange={e => setValidUntil(e.target.value)} className="w-full bg-ocean-950/50 border border-ocean-700 rounded-xl px-4 py-2.5 text-white focus:ring-2 focus:ring-indigo-500 outline-none" />
                       </div>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* Actions / Navigation */}
             <div className="pt-4 flex justify-between items-center border-t border-white/10 mt-6">
                <button type="button" onClick={onBack} className="px-6 py-3 text-ocean-300 hover:text-white transition-colors">Cancel</button>
-               
                <div className="flex space-x-3">
-                 {step === 2 && (
-                   <button 
-                     type="button" 
-                     onClick={() => setStep(1)} 
-                     className="px-6 py-3 bg-ocean-800 hover:bg-ocean-700 text-white font-bold rounded-xl shadow-lg flex items-center transition-all"
-                   >
-                     <ArrowLeft className="w-4 h-4 mr-2" /> Back
-                   </button>
-                 )}
-                 
+                 {step === 2 && <button type="button" onClick={() => setStep(1)} className="px-6 py-3 bg-ocean-800 hover:bg-ocean-700 text-white font-bold rounded-xl shadow-lg flex items-center transition-all"><ArrowLeft className="w-4 h-4 mr-2" /> Back</button>}
                  {step === 1 ? (
-                   <button 
-                     type="button" 
-                     onClick={handleNext}
-                     className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center transition-all"
-                   >
-                     Next Step <ArrowRight className="w-4 h-4 ml-2" />
-                   </button>
+                   <button type="button" onClick={handleNext} className="px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl shadow-lg flex items-center transition-all">Next Step <ArrowRight className="w-4 h-4 ml-2" /></button>
                  ) : (
-                   <button 
-                     type="submit" 
-                     className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg flex items-center transition-all"
-                   >
+                   <button type="submit" className="px-8 py-3 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold rounded-xl shadow-lg flex items-center transition-all">
                      <Save className="w-4 h-4 mr-2" /> {isResponseMode ? 'Send Inquiry' : 'Save Inquiry'}
                    </button>
                  )}

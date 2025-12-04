@@ -1,33 +1,41 @@
 
 import React, { useState } from 'react';
-import { Mail, ArrowRight, Lock, Loader2, Anchor } from 'lucide-react';
+import { Mail, ArrowRight, Lock, Loader2, Anchor, ShieldCheck } from 'lucide-react';
 import { authService } from '../services/authService';
 
 interface LoginFormProps {
   onLoginSuccess: (email: string) => void;
   onUserNotFound: (email: string) => void;
+  onAdminLogin: () => void;
+  onSubscriptionExpired: (email: string) => void;
 }
 
-export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotFound }) => {
-  const [step, setStep] = useState<'EMAIL' | 'OTP'>('EMAIL');
+export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotFound, onAdminLogin, onSubscriptionExpired }) => {
+  const [step, setStep] = useState<'EMAIL' | 'OTP' | 'ADMIN_PASS'>('EMAIL');
   const [email, setEmail] = useState('');
   const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleEmailSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email) return;
-    setIsLoading(true);
     setError('');
 
+    // Admin Check
+    if (email.toLowerCase() === 'admin') {
+        setStep('ADMIN_PASS');
+        return;
+    }
+
+    setIsLoading(true);
     try {
       const exists = authService.checkUserExists(email);
       if (exists) {
         await authService.sendOtp(email);
         setStep('OTP');
       } else {
-        // Direct flow to signup if user doesn't exist
         onUserNotFound(email);
       }
     } catch (err) {
@@ -37,6 +45,15 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotF
     }
   };
 
+  const handleAdminLogin = (e: React.FormEvent) => {
+      e.preventDefault();
+      if (authService.verifyAdminPassword(password)) {
+          onAdminLogin();
+      } else {
+          setError('Invalid Admin Credentials');
+      }
+  };
+
   const handleOtpSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otp) return;
@@ -44,17 +61,13 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotF
     setError('');
 
     try {
-      const isValid = await authService.verifyOtp(email, otp);
-      if (isValid) {
-        // Check Status
-        const user = authService.getUser(email);
-        if (user && user.status === 'SUSPENDED') {
-          setError('Your account has been Suspended. Please contact your administrator.');
-        } else {
+      const result = await authService.verifyOtp(email, otp);
+      if (result.success) {
           onLoginSuccess(email);
-        }
+      } else if (result.expired) {
+          onSubscriptionExpired(email);
       } else {
-        setError('Invalid OTP. Please try "1234"');
+          setError(result.error || 'Verification failed');
       }
     } catch (err) {
       setError('Verification failed.');
@@ -68,25 +81,25 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotF
       <div className="text-center mb-8">
         <div className="flex justify-center mb-4">
           <div className="p-4 bg-ocean-900/50 rounded-full border border-ocean-700 shadow-xl">
-            <Anchor className="h-10 w-10 text-cyan-400" />
+            {step === 'ADMIN_PASS' ? <ShieldCheck className="h-10 w-10 text-emerald-400" /> : <Anchor className="h-10 w-10 text-cyan-400" />}
           </div>
         </div>
-        <h2 className="text-3xl font-bold text-white mb-2">Seafrex Portal</h2>
-        <p className="text-ocean-200">Secure access for logistics partners</p>
+        <h2 className="text-3xl font-bold text-white mb-2">{step === 'ADMIN_PASS' ? 'Admin Access' : 'Seafrex Portal'}</h2>
+        <p className="text-ocean-200">{step === 'ADMIN_PASS' ? 'Restricted Area' : 'Secure access for logistics partners'}</p>
       </div>
 
-      {step === 'EMAIL' ? (
+      {step === 'EMAIL' && (
         <form onSubmit={handleEmailSubmit} className="space-y-6">
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-ocean-100 mb-2">
-              Email Address
+              Email Address / User ID
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ocean-400">
                 <Mail className="h-5 w-5" />
               </div>
               <input
-                type="email"
+                type="text"
                 id="email"
                 required
                 className="block w-full pl-10 pr-3 py-3 bg-ocean-900/50 border border-ocean-700 rounded-xl text-white placeholder-ocean-400 focus:outline-none focus:ring-2 focus:ring-ocean-400 focus:border-transparent transition-all"
@@ -106,12 +119,14 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotF
               <Loader2 className="w-5 h-5 animate-spin" />
             ) : (
               <>
-                Continue with Email <ArrowRight className="ml-2 w-5 h-5" />
+                Continue <ArrowRight className="ml-2 w-5 h-5" />
               </>
             )}
           </button>
         </form>
-      ) : (
+      )}
+
+      {step === 'OTP' && (
         <form onSubmit={handleOtpSubmit} className="space-y-6">
           <div className="text-center mb-4">
              <p className="text-sm text-ocean-200">We sent a code to <span className="font-semibold text-white">{email}</span></p>
@@ -134,7 +149,7 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotF
             />
           </div>
 
-          {error && <p className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded-lg">{error}</p>}
+          {error && <p className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded-lg border border-red-500/20">{error}</p>}
 
           <button
             type="submit"
@@ -148,6 +163,44 @@ export const LoginForm: React.FC<LoginFormProps> = ({ onLoginSuccess, onUserNotF
             )}
           </button>
         </form>
+      )}
+
+      {step === 'ADMIN_PASS' && (
+          <form onSubmit={handleAdminLogin} className="space-y-6">
+            <div className="text-center mb-4">
+               <p className="text-sm text-ocean-200">Hello, <span className="font-semibold text-white">Super Admin</span></p>
+               <button type="button" onClick={() => { setStep('EMAIL'); setEmail(''); }} className="text-xs text-ocean-400 hover:text-white underline mt-1">Not Admin? Go Back</button>
+            </div>
+  
+            <div>
+              <label htmlFor="pass" className="block text-sm font-medium text-ocean-100 mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-ocean-400">
+                    <Lock className="h-5 w-5" />
+                </div>
+                <input
+                    type="password"
+                    id="pass"
+                    required
+                    className="block w-full pl-10 pr-3 py-3 bg-ocean-900/50 border border-ocean-700 rounded-xl text-white placeholder-ocean-600 focus:outline-none focus:ring-2 focus:ring-emerald-400 focus:border-transparent transition-all"
+                    placeholder="Enter password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                />
+              </div>
+            </div>
+  
+            {error && <p className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded-lg border border-red-500/20">{error}</p>}
+  
+            <button
+              type="submit"
+              className="w-full flex items-center justify-center py-3.5 px-4 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-semibold rounded-xl shadow-lg shadow-emerald-500/30 transition-all"
+            >
+              Access Admin Panel
+            </button>
+          </form>
       )}
     </div>
   );

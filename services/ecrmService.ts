@@ -27,11 +27,11 @@ const INITIAL_DATA: EcrmTicket[] = [
     partyName: 'Amit Patel (Apex Logistics)',
     subject: 'Invoice Discrepancy',
     message: 'The amount in invoice #992 does not match the PO.',
-    status: 'REPLIED',
+    status: 'PENDING',
     date: '2024-05-14',
     history: [
       { date: '2024-05-14 09:30 AM', action: 'Ticket Received', by: 'System' },
-      { date: '2024-05-14 11:00 AM', action: 'Replied to Ticket', by: 'You' }
+      { date: '2024-05-14 11:00 AM', action: 'Response Added', by: 'You' }
     ],
     createdBy: 'main'
   },
@@ -81,7 +81,7 @@ export const ecrmService = {
       ticket.history.push({
         date: new Date().toLocaleString(),
         action: `Status changed to ${newStatus}`,
-        by: 'You'
+        by: 'System'
       });
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
     }
@@ -97,15 +97,9 @@ export const ecrmService = {
         by: by
       });
       
-      // Auto-update status from Pending to Replied if user responds
-      if (ticket.status === 'PENDING') {
-         ticket.status = 'REPLIED';
-         ticket.history.push({
-            date: new Date().toLocaleString(),
-            action: 'Status auto-updated to REPLIED',
-            by: 'System'
-         });
-      }
+      // NOTE: Status remains PENDING even after response, unless manually resolved.
+      // If it was RESOLVED and a response is added, it typically implies re-opening, 
+      // but we handle that explicitly in UI via updateStatus.
       
       localStorage.setItem(STORAGE_KEY, JSON.stringify(tickets));
     }

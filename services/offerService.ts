@@ -1,5 +1,7 @@
 
 import { Offer } from '../types';
+import { bookingService } from './bookingService';
+import { authService } from './authService';
 
 const STORAGE_KEY = 'ocean_offers';
 
@@ -168,6 +170,17 @@ export const offerService = {
     if (offer) {
       offer.status = status;
       localStorage.setItem(STORAGE_KEY, JSON.stringify(offers));
+
+      // Trigger Booking Creation if Accepted
+      // Only trigger if new status is ACCEPTED
+      if (status === 'ACCEPTED') {
+          const currentUser = authService.getCurrentUser();
+          bookingService.createBookingFromOffer(
+              offer, 
+              currentUser?.email || 'unknown', // Client User ID
+              currentUser?.fullName || 'Client' // Client User Name
+          );
+      }
     }
   },
 

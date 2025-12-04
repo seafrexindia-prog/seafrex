@@ -9,9 +9,10 @@ interface InquiryListProps {
   onBack: () => void;
   onCreateNew: () => void;
   currentUser: UserProfile;
+  onViewProfile?: (profile: Partial<UserProfile>) => void;
 }
 
-export const InquiryList: React.FC<InquiryListProps> = ({ onBack, onCreateNew, currentUser }) => {
+export const InquiryList: React.FC<InquiryListProps> = ({ onBack, onCreateNew, currentUser, onViewProfile }) => {
   const [inquiries, setInquiries] = useState<Inquiry[]>([]);
   const [displayedInquiries, setDisplayedInquiries] = useState<Inquiry[]>([]); // Data actually shown in table
   const [searchTerm, setSearchTerm] = useState('');
