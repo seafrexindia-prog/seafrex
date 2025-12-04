@@ -12,28 +12,20 @@ const App: React.FC = () => {
   const [view, setView] = useState<AuthState>('LOGIN_EMAIL');
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(null);
   const [tempEmail, setTempEmail] = useState('');
-  const [isInitializing, setIsInitializing] = useState(true);
 
   // Initial load check
   useEffect(() => {
-    const initApp = () => {
-      const user = authService.getCurrentUser();
-      if (user) {
-        // Check for expiry on reload
-        if (new Date(user.expiryDate) < new Date()) {
-            setTempEmail(user.email);
-            setView('SUBSCRIPTION_EXPIRED');
-        } else {
-            setCurrentUser(user);
-            setView('DASHBOARD');
-        }
+    const user = authService.getCurrentUser();
+    if (user) {
+      // Check for expiry on reload
+      if (new Date(user.expiryDate) < new Date()) {
+          setTempEmail(user.email);
+          setView('SUBSCRIPTION_EXPIRED');
       } else {
-        setView('LOGIN_EMAIL');
+          setCurrentUser(user);
+          setView('DASHBOARD');
       }
-      setIsInitializing(false);
-    };
-
-    initApp();
+    }
   }, []);
 
   const handleLoginSuccess = (email: string) => {
@@ -88,17 +80,6 @@ const App: React.FC = () => {
       }
   };
 
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-ocean-950 flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="w-10 h-10 border-4 border-ocean-500 border-t-transparent rounded-full animate-spin"></div>
-          <p className="mt-4 text-ocean-300">Initializing Portal...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className={`min-h-screen ${view === 'ADMIN_PANEL' ? 'bg-slate-950' : 'bg-ocean-950 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-ocean-800 via-ocean-950 to-black'} text-white flex items-center justify-center relative overflow-hidden`}>
       
@@ -137,7 +118,12 @@ const App: React.FC = () => {
                 onSignupSuccess={handleSignupSuccess}
                 onCancel={handleCancelSignup}
               />
-            ) : null}
+            ) : (
+              <div className="flex flex-col items-center">
+                <div className="w-10 h-10 border-4 border-ocean-500 border-t-transparent rounded-full animate-spin"></div>
+                <p className="mt-4 text-ocean-300">Loading Seafrex Portal...</p>
+              </div>
+            )}
           </main>
       )}
 
