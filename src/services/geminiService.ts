@@ -1,12 +1,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { UserRole } from "../types";
 
-// Initialize Gemini Client
-// FIX: Use import.meta.env for Vite instead of process.env
-// We cast to 'any' to prevent TypeScript errors if Vite types aren't fully loaded in your IDE
-const apiKey = (import.meta as any).env?.VITE_API_KEY || '';
-
-const ai = new GoogleGenAI({ apiKey });
+// Helper to safely get the API key
+const getApiKey = () => (import.meta as any).env?.VITE_API_KEY || '';
 
 export const geminiService = {
   /**
@@ -18,12 +14,16 @@ export const geminiService = {
     company: string
   ): Promise<string> => {
     try {
-      // If no API key is set, return a default message to prevent crashing
+      const apiKey = getApiKey();
+      
+      // Safety check: If key is missing, return fallback immediately without initializing SDK
       if (!apiKey) {
         console.warn("Gemini API Key missing. Skipping AI generation.");
         return `Welcome ${name}! We are thrilled to have ${company} on board. As a ${role}, you play a vital role in our logistics network.`;
       }
 
+      // Initialize client only when needed and valid
+      const ai = new GoogleGenAI({ apiKey });
       const model = 'gemini-2.5-flash';
       const prompt = `
         You are an expert logistics consultant.
